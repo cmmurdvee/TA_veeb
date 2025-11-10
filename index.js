@@ -5,9 +5,9 @@ const bodyparser = require("body-parser");
 //SQL andmebaasi moodul
 //const mysql = require("mysql2");
 //Kuna kasutame asünkroonust, siis impordime mysql2/promise mooduli
-//const mysql = require("mysql2/promise");
+const mysql = require("mysql2/promise");
 const dateEt = require("./src/dateTimeET");
-//const dbInfo = require("../../VP_2025_config");
+const dbInfo = require("../../VP_2025_config");
 const textRef = "public/txt/vanasonad.txt";
 //käivitan express.js funktsiooni ja annan talle nimeks "app"
 const app = express();
@@ -16,12 +16,41 @@ app.set("view engine", "ejs");
 //määran ühe päris kataloogi avalikult kättesaadavaks
 app.use(express.static("public"));
 //parsime päringu URL-i, lipp false, kui ainult tekst ja true, kui muid andmeid ka
+
 app.use(bodyparser.urlencoded({extended: true}));
 
+const dbConf = {
+	host: dbInfo.configData.host,
+	user: dbInfo.configData.user,
+	password: dbInfo.configData.passWord,
+	database: dbInfo.configData.dataBase
+};
 
-app.get("/", (req, res)=>{
-	//res.send("Express.js läks käima ja serveerib veebi!");
-	res.render("index");
+app.get("/", async (req, res)=>{
+	let conn;
+	try {
+		conn = await mysql.createConnection(dbConf);
+		let sqlReq = "SELECT filename, alttext FROM galleryphotos_id WHERE id=(SELECT MAX(id) FROM galleryphotos_id WHERE privacy=? AND deleteit IS NULL)";
+		const privacy = 3;
+		const [rows, fields] = await conn.execute(sqlReq, [privacy]);
+		console.log(rows);
+		let imgAlt = "Avalik foto";
+		if(rows[0].alttext != ""){
+			imgAlt = rows[0].alttext;
+		}
+		res.render("index", {imgFile: "gallery/normal/" + rows[0].filename, imgAlt: imgAlt});
+	}
+	catch(err){
+		console.log(err);
+		//res.render("index");
+		res.render("index", {imgFile: "images/otsin_pilte.jpg", imgAlt: "Tunnen end, kui pilti otsiv lammas ..."});
+	}
+	finally {
+		if(conn){
+			await conn.end();
+			console.log("Andmebaasiühendus suletud!");
+		}
+	}
 });
 
 app.get("/timenow", (req, res)=>{
@@ -93,6 +122,10 @@ app.use("/Eestifilm", eestifilmRouter);
 
 //Galerii fotode üleslaadimine
 const photoupRouter = require("./routes/photoupRoutes");
-app.use("/galleryphotoupload", photoupRouter);
+app.use("/galleryphotupload", photoupRouter);
+
+//Galerii marsruudid
+const galleryRouter = require("./routes/galleryRoutes");
+app.use("/photogallery", galleryRouter);
 
 app.listen(5121);

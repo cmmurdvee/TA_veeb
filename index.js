@@ -2,15 +2,18 @@ const express = require("express");
 const fs = require("fs");
 //päringu lahtiharutaja POST jaoks
 const bodyparser = require("body-parser");
+const session = require("express-session")
 //SQL andmebaasi moodul
 //const mysql = require("mysql2");
 //Kuna kasutame asünkroonust, siis impordime mysql2/promise mooduli
 const mysql = require("mysql2/promise");
 const dateEt = require("./src/dateTimeET");
 const dbInfo = require("../../VP_2025_config");
+const loginCheck = require("./src/checklogin")
 const textRef = "public/txt/vanasonad.txt";
 //käivitan express.js funktsiooni ja annan talle nimeks "app"
 const app = express();
+app.use(session({secret: dbInfo.configData.sessionsecret, saveUninitialized: true, resave: true}));
 //määran veebilehtede mallide renderdamise mootori
 app.set("view engine", "ejs");
 //määran ühe päris kataloogi avalikult kättesaadavaks
@@ -116,6 +119,20 @@ app.get("/visitlog", (req, res)=>{
 	});
 });
 
+//sisseloginud kasutajate osa avaleht (ei ole kõige viisakam meetod, kuidas koodi kirjutada)
+app.get("/home", loginCheck.isLogin, (req, res) =>{
+	console.log("Sisse logis kasutaja: " + req.session.userId);
+	res.render("home", {user: req.session.firstName + " " + req.session.lastName});
+});
+
+//välja logimine
+app.get("/logout", (req, res) =>{
+	//Tühistame sessiooni
+	req.session.destroy();
+	console.log("Välja logitud!");
+	res.redirect("/");
+});
+
 //Eesti filmi marsruudid
 const eestifilmRouter = require("./routes/eestifilmRoutes");
 app.use("/Eestifilm", eestifilmRouter);
@@ -131,5 +148,9 @@ app.use("/photogallery", galleryRouter);
 //Konto loomise marsruudid
 const signupRouter = require("./routes/signupRoutes");
 app.use("/signup", signupRouter);
+
+//Sisselogimise marsruudid
+const signinRouter = require("./routes/signinRoutes");
+app.use("/signin", signinRouter);
 
 app.listen(5121);

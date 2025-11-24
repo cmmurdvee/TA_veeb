@@ -27,6 +27,7 @@ const signupPage = (req, res)=>{
 
 const signupPagePost = async (req, res)=>{
 	let conn;
+	let notice = "";
 	console.log(req.body);
 	//andmete valideerimine
 	if(
@@ -44,12 +45,20 @@ const signupPagePost = async (req, res)=>{
 	}
 
 	try {
-	  //krüpteerime parooli
-	  const pwdHash = await argon2.hash(req.body.passwordInput)
-	  //console.log(pwdHash);
-	  //console.log(pwdHash.length);
-	  conn = await mysql.createConnection(dbConf);
-	  let sqlReq = "INSERT INTO users_ta (first_name, last_name, birth_date, gender, email, password) VALUES (?, ?, ?, ?, ?, ?)";
+		conn = await mysql.createConnection(dbConf);
+		//kontrollin, ega sellist juba pole
+		let sqlReq = "SELECT id from users_ta WHERE email = ?";
+		const [users] = await conn.execute(sqlReq, [req.body.emailInput]);
+		if(users.length > 0){
+			notice = "Selline kasutaja on juba olemas!";
+			console.log(notice);
+			return res.render("signup", {notice: notice});
+		}
+		//krüpteerime parooli
+		const pwdHash = await argon2.hash(req.body.passwordInput)
+		//console.log(pwdHash);
+		//console.log(pwdHash.length);
+		sqlReq = "INSERT INTO users_ta (first_name, last_name, birth_date, gender, email, password) VALUES (?, ?, ?, ?, ?, ?)";
 
 	  const [result] = await conn.execute(sqlReq, [
 		req.body.firstNameInput,

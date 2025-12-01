@@ -1,4 +1,5 @@
 const express = require("express");
+require("dotenv").config();
 const fs = require("fs");
 //päringu lahtiharutaja POST jaoks
 const bodyparser = require("body-parser");
@@ -10,10 +11,14 @@ const mysql = require("mysql2/promise");
 const dateEt = require("./src/dateTimeET");
 const dbInfo = require("../../VP_2025_config");
 const loginCheck = require("./src/checklogin")
+const pool = require("./src/dbPool")
 const textRef = "public/txt/vanasonad.txt";
 //käivitan express.js funktsiooni ja annan talle nimeks "app"
+
+
 const app = express();
-app.use(session({secret: dbInfo.configData.sessionsecret, saveUninitialized: true, resave: true}));
+//app.use(session({secret: dbInfo.configData.sessionsecret, saveUninitialized: true, resave: true}));
+app.use(session({secret: process.env.SES_SECRET, saveUninitialized: true, resave: true}));
 //määran veebilehtede mallide renderdamise mootori
 app.set("view engine", "ejs");
 //määran ühe päris kataloogi avalikult kättesaadavaks
@@ -29,13 +34,16 @@ const dbConf = {
 	database: dbInfo.configData.dataBase
 };
 
+console.log(process.env.DB_HOST);
+
 app.get("/", async (req, res)=>{
-	let conn;
+	//let conn;
 	try {
-		conn = await mysql.createConnection(dbConf);
+		//conn = await mysql.createConnection(dbConf);
 		let sqlReq = "SELECT filename, alttext FROM galleryphotos_id WHERE id=(SELECT MAX(id) FROM galleryphotos_id WHERE privacy=? AND deleteit IS NULL)";
 		const privacy = 3;
-		const [rows, fields] = await conn.execute(sqlReq, [privacy]);
+		//const [rows, fields] = await conn.execute(sqlReq, [privacy]);
+		const [rows, fields] = await pool.execute(sqlReq, [privacy]);
 		console.log(rows);
 		let imgAlt = "Avalik foto";
 		if(rows[0].alttext != ""){
@@ -49,10 +57,10 @@ app.get("/", async (req, res)=>{
 		res.render("index", {imgFile: "images/otsin_pilte.jpg", imgAlt: "Tunnen end, kui pilti otsiv lammas ..."});
 	}
 	finally {
-		if(conn){
+/* 		if(conn){
 			await conn.end();
 			console.log("Andmebaasiühendus suletud!");
-		}
+		} */
 	}
 });
 

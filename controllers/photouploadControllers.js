@@ -1,15 +1,8 @@
 const mysql = require("mysql2/promise");
 const fs = require("fs").promises;
 const sharp = require("sharp");
-const dbInfo = require("../../../VP_2025_config");
+const pool = require("../src/dbPool")
 const watermarkFile = "./public/images/vp_logo_small.png";
-
-const dbConf = {
-	host: dbInfo.configData.host,
-	user: dbInfo.configData.user,
-	password: dbInfo.configData.passWord,
-	database: dbInfo.configData.dataBase
-}
 
 //@desc home page for uploading gallery photos
 //@route GET /galleryphotoupload
@@ -27,7 +20,6 @@ const photouploadPage = (req, res)=>{
 
 
 const photouploadPagePost = async (req, res)=>{
-	let conn;
 	console.log(req.body);
 	console.log(req.file);
 	try {
@@ -55,11 +47,10 @@ const photouploadPagePost = async (req, res)=>{
 		await normalImageProcessor.toFile("./public/gallery/normal/" + fileName);
 	  //loon thumbnail pildi 100X100
 	  await sharp(req.file.destination + fileName).resize(100,100).jpeg({quality: 90}).toFile("./public/gallery/thumbs/" + fileName);
-	  conn = await mysql.createConnection(dbConf);
 	  let sqlReq = "INSERT INTO galleryphotos_id (filename, origname, alttext, privacy, userid) VALUES(?,?,?,?,?)";
 	  //kuna kasutajakontosid veel ei ole, siis määrame userid = 1, UPD: nüüd on kasutajakontod olemas
 	  const userId = req.session.userId;
-	  const [result] = await conn.execute(sqlReq, [fileName, req.file.originalname, req.body.altInput, req.body.privacyInput, userId]);
+	  const [result] = await pool.execute(sqlReq, [fileName, req.file.originalname, req.body.altInput, req.body.privacyInput, userId]);
 	  console.log("Salvestati kirje: " + result.insertId);
 	  res.render("galleryphotoupload");
 	}
@@ -68,10 +59,10 @@ const photouploadPagePost = async (req, res)=>{
 	  res.render("galleryphotoupload");
 	}
 	finally {
-	  if(conn){
+/* 	  if(conn){
 	  await conn.end();
 	    console.log("Andmebaasiühendus on suletud!");
-	  }
+	  } */
 	}
 };
 

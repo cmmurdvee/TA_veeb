@@ -1,14 +1,15 @@
 const mysql = require("mysql2/promise");
 const argon2 = require("argon2");
-const dbInfo = require("../../../VP_2025_config");
+const validator = require("validator");
+//const dbInfo = require("../../../VP_2025_config");
+const pool = require("../src/dbPool")
 
-
-const dbConf = {
+/* const dbConf = {
 	host: dbInfo.configData.host,
 	user: dbInfo.configData.user,
 	password: dbInfo.configData.passWord,
 	database: dbInfo.configData.dataBase
-}
+} */
 
 //@desc home page for signup
 //@route GET /signup
@@ -26,11 +27,11 @@ const signupPage = (req, res)=>{
 
 
 const signupPagePost = async (req, res)=>{
-	let conn;
+	//let conn;
 	let notice = "";
 	console.log(req.body);
 	//andmete valideerimine
-	if(
+/* 	if(
 		!req.body.firstNameInput ||
 		!req.body.lastNameInput ||
 		!req.body.birthDateInput ||
@@ -42,13 +43,59 @@ const signupPagePost = async (req, res)=>{
 		let notice = "Andmeid on puudu või miski on vigane!"
 		console.log(notice);
 		return res.render("signup", {notice: notice});
+	} */
+	//puhastame andmeid
+	const firstName = validator.escape(req.body.firstNameInput.trim());
+	const lastName = validator.escape(req.body.lastNameInput.trim());
+	const birthDate = req.body.birthDateInput;
+	const gender = req.body.genderInput;
+	const email = req.body.emailInput.trim();
+	const password = req.body.passwordInput;
+	const confirmPassword = req.body.confirmPasswordInput;
+
+	//kas kõik oluline on olemas?
+	if(!firstName || !lastName || !birthDate || !gender || !email || !password || !confirmPassword){
+		let notice = "Andmeid on puudu või miski on vigane!";
+		console.log(notice);
+		return res.render("signup", {notice: notice});
 	}
 
+	//kas email on korras?
+	if(!validator.isEmail(email)){
+		let notice = "E-mail on vigane!";
+		//console.log(notice);
+		return res.render("signup", {notice: notice});
+	}
+
+	// kas parool on õige?
+	const passwordOptions = {minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 0};
+	if(!validator.isStrongPassword(password, passwordOptions)){
+		let notice = "Parool on liiga nõrk!";
+		//console.log(notice);
+		return res.render("signup", {notice: notice});
+	}
+
+	//kas paroolid klapivad?
+	if(password !== confirmPassword){
+		let notice = "Paroolid ei klapi!";
+		//console.log(notice);
+		return res.render("signup", {notice: notice});
+	}
+
+	//kas sünnikuupäev on korrektne?
+	if(!validator.isDate(birthDate) || validator.isAfter(birthDate)){
+		let notice = "Sünnikuupäev pole reaalne";
+		//console.log(notice);
+		return res.render("signup", {notice: notice});
+	}
+		
+
 	try {
-		conn = await mysql.createConnection(dbConf);
+		//conn = await mysql.createConnection(dbConf);
 		//kontrollin, ega sellist juba pole
 		let sqlReq = "SELECT id from users_ta WHERE email = ?";
-		const [users] = await conn.execute(sqlReq, [req.body.emailInput]);
+		//const [users] = await conn.execute(sqlReq, [req.body.emailInput]);
+		const [users] = await pool.execute(sqlReq, [req.body.emailInput]);
 		if(users.length > 0){
 			notice = "Selline kasutaja on juba olemas!";
 			console.log(notice);
@@ -60,7 +107,7 @@ const signupPagePost = async (req, res)=>{
 		//console.log(pwdHash.length);
 		sqlReq = "INSERT INTO users_ta (first_name, last_name, birth_date, gender, email, password) VALUES (?, ?, ?, ?, ?, ?)";
 
-	  const [result] = await conn.execute(sqlReq, [
+	  const [result] = await pool.execute(sqlReq, [
 		req.body.firstNameInput,
 		req.body.lastNameInput,
 		req.body.birthDateInput,
@@ -76,10 +123,10 @@ const signupPagePost = async (req, res)=>{
 	  res.render("signup", {notice:"Tehniline viga"});
 	}
 	finally {
-	  if(conn){
+/* 	  if(conn){
 	  await conn.end();
 	    console.log("Andmebaasiühendus on suletud!");
-	  }
+	  } */
 	}
 };
 
